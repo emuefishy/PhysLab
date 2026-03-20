@@ -667,7 +667,7 @@ function setupVoltageSlider() {
     const v = Number(slider.value);
     display.textContent = v + ' V';
     const diff = Math.abs(v - simDroplet.suspensionV);
-    const tolerance = simDroplet.suspensionV * 0.08;
+    const tolerance = simDroplet.suspensionV * 0.015;
     if (diff < tolerance) renderSimDiagram(v, 'suspended');
     else if (v > simDroplet.suspensionV) renderSimDiagram(v, 'field-rising');
     else renderSimDiagram(v, 'field-falling');
@@ -677,7 +677,7 @@ function setupVoltageSlider() {
 function trySuspend() {
   const v = Number(document.getElementById('voltageSlider').value);
   const diff = Math.abs(v - simDroplet.suspensionV);
-  const tolerance = simDroplet.suspensionV * 0.08;
+  const tolerance = simDroplet.suspensionV * 0.015;
   const fb = document.getElementById('suspendFeedback');
 
   if (diff < tolerance) {
@@ -687,7 +687,7 @@ function trySuspend() {
     document.getElementById('btnSuspend').textContent = '✓ Droplet Suspended';
     renderSimDiagram(v, 'suspended');
     showObservedData(v);
-  } else if (v > simDroplet.suspensionV * 1.08) {
+  } else if (v > simDroplet.suspensionV * 1.015) {
     fb.textContent = 'The droplet is drifting upward. Reduce the voltage.';
   } else {
     fb.textContent = 'The droplet is falling. Increase the voltage.';
@@ -709,11 +709,23 @@ function buildCalcSteps(appliedV, vt) {
   const container = document.getElementById('calcSteps');
   container.innerHTML = '';
 
-  const r = simDroplet.radius;
-  const m = simDroplet.mass;
-  const q = simDroplet.charge;
-  const n = simDroplet.n;
-  const correctE = appliedV / SIM.d;
+  // Derive ALL answers from the measured quantities only — just like a real experiment.
+  // The student only knows: vt (from fall time), appliedV (from slider), and the given constants.
+
+  // Step 1: radius from Stokes' law using measured vt
+  const r_meas = Math.sqrt((9 * SIM.eta * vt) / (2 * SIM.rhoOil * SIM.g));
+
+  // Step 2: mass from measured radius
+  const m_meas = SIM.rhoOil * (4/3) * Math.PI * Math.pow(r_meas, 3);
+
+  // Step 3: E field from measured voltage
+  const E_meas = appliedV / SIM.d;
+
+  // Step 4: charge from measured mass and E
+  const q_meas = (m_meas * SIM.g) / E_meas;
+
+  // Step 5: n from measured charge
+  const n_meas = Math.round(q_meas / SIM.e);
 
   // Helper to format a number as LaTeX scientific notation
   function tex(val, dp=2) {
@@ -727,50 +739,50 @@ function buildCalcSteps(appliedV, vt) {
       id: 'radius',
       label: 'Step 1: Find the radius using Stokes\' law',
       formula: `\\[ v_t = \\frac{2r^2 \\rho g}{9\\eta} \\quad \\Rightarrow \\quad r = \\sqrt{\\frac{9 \\eta \\, v_t}{2 \\rho \\, g}} \\]`,
-      answer: r,
+      answer: r_meas,
       tolerance: 0.08,
-      formatAnswer: () => `\\( r = ${tex(r)} \\; \\text{m} \\)`,
-      hint: `\\( r = \\sqrt{\\dfrac{9 \\times ${tex(SIM.eta)} \\times ${tex(vt,3)}}{2 \\times ${SIM.rhoOil} \\times ${SIM.g}}} = ${tex(r)} \\; \\text{m} \\)`,
+      formatAnswer: () => `\\( r = ${tex(r_meas)} \\; \\text{m} \\)`,
+      hint: `\\( r = \\sqrt{\\dfrac{9 \\times ${tex(SIM.eta)} \\times ${tex(vt,3)}}{2 \\times ${SIM.rhoOil} \\times ${SIM.g}}} = ${tex(r_meas)} \\; \\text{m} \\)`,
       placeholder: 'e.g. 1.50e-6',
     },
     {
       id: 'mass',
       label: 'Step 2: Calculate the mass',
       formula: `\\[ m = \\rho \\times \\tfrac{4}{3} \\pi r^3 \\]`,
-      answer: m,
+      answer: m_meas,
       tolerance: 0.10,
-      formatAnswer: () => `\\( m = ${tex(m)} \\; \\text{kg} \\)`,
-      hint: `\\( m = ${SIM.rhoOil} \\times \\tfrac{4}{3} \\pi \\times (${tex(r)})^3 = ${tex(m)} \\; \\text{kg} \\)`,
+      formatAnswer: () => `\\( m = ${tex(m_meas)} \\; \\text{kg} \\)`,
+      hint: `\\( m = ${SIM.rhoOil} \\times \\tfrac{4}{3} \\pi \\times (${tex(r_meas)})^3 = ${tex(m_meas)} \\; \\text{kg} \\)`,
       placeholder: 'e.g. 3.45e-15',
     },
     {
       id: 'efield',
       label: 'Step 3: Calculate the electric field',
       formula: `\\[ E = \\frac{V}{d} \\]`,
-      answer: correctE,
+      answer: E_meas,
       tolerance: 0.03,
-      formatAnswer: () => `\\( E = ${tex(correctE)} \\; \\text{V m}^{-1} \\)`,
-      hint: `\\( E = \\dfrac{${appliedV.toFixed(0)}}{${SIM.d}} = ${tex(correctE)} \\; \\text{V m}^{-1} \\)`,
+      formatAnswer: () => `\\( E = ${tex(E_meas)} \\; \\text{V m}^{-1} \\)`,
+      hint: `\\( E = \\dfrac{${appliedV.toFixed(0)}}{${SIM.d}} = ${tex(E_meas)} \\; \\text{V m}^{-1} \\)`,
       placeholder: 'e.g. 5.00e4',
     },
     {
       id: 'charge',
       label: 'Step 4: Calculate the charge',
       formula: `\\[ qE = mg \\quad \\Rightarrow \\quad q = \\frac{mg}{E} \\]`,
-      answer: q,
+      answer: q_meas,
       tolerance: 0.12,
-      formatAnswer: () => `\\( q = ${tex(q)} \\; \\text{C} \\)`,
-      hint: `\\( q = \\dfrac{${tex(m)} \\times ${SIM.g}}{${tex(correctE)}} = ${tex(q)} \\; \\text{C} \\)`,
+      formatAnswer: () => `\\( q = ${tex(q_meas)} \\; \\text{C} \\)`,
+      hint: `\\( q = \\dfrac{${tex(m_meas)} \\times ${SIM.g}}{${tex(E_meas)}} = ${tex(q_meas)} \\; \\text{C} \\)`,
       placeholder: 'e.g. 4.80e-19',
     },
     {
       id: 'nvalue',
       label: 'Step 5: How many elementary charges?',
       formula: `\\[ n = \\frac{q}{e} \\]`,
-      answer: n,
+      answer: n_meas,
       tolerance: 0.01,
-      formatAnswer: () => `\\( n = ${n} \\)`,
-      hint: `\\( n = \\dfrac{${tex(q)}}{${tex(SIM.e)}} = ${n} \\)`,
+      formatAnswer: () => `\\( n = ${n_meas} \\)`,
+      hint: `\\( n = \\dfrac{${tex(q_meas)}}{${tex(SIM.e)}} \\approx ${(q_meas / SIM.e).toFixed(1)} \\rightarrow ${n_meas} \\)`,
       placeholder: 'e.g. 3',
       isInteger: true,
     },
@@ -871,13 +883,23 @@ function checkStep(stepId) {
 function showFinalResult() {
   const div = document.getElementById('simResult');
   div.style.display = '';
-  const qExp = Math.floor(Math.log10(Math.abs(simDroplet.charge)));
-  const qCoeff = (simDroplet.charge / Math.pow(10, qExp)).toFixed(2);
+
+  // Rederive from measured data, same as buildCalcSteps
+  const vt = SIM.fallDist / simFallTime;
+  const appliedV = Number(document.getElementById('voltageSlider').value);
+  const r_meas = Math.sqrt((9 * SIM.eta * vt) / (2 * SIM.rhoOil * SIM.g));
+  const m_meas = SIM.rhoOil * (4/3) * Math.PI * Math.pow(r_meas, 3);
+  const E_meas = appliedV / SIM.d;
+  const q_meas = (m_meas * SIM.g) / E_meas;
+  const n_meas = Math.round(q_meas / SIM.e);
+
+  const qExp = Math.floor(Math.log10(Math.abs(q_meas)));
+  const qCoeff = (q_meas / Math.pow(10, qExp)).toFixed(2);
   div.innerHTML = `
     <div class="trial-result">
       <h3>Trial Complete!</h3>
       <div class="charge-value">\\( q = ${qCoeff} \\times 10^{${qExp}} \\; \\text{C} \\)</div>
-      <div class="multiple">\\( = ${simDroplet.n}e = ${simDroplet.n} \\times 1.60 \\times 10^{-19} \\; \\text{C} \\)</div>
+      <div class="multiple">\\( \\approx ${n_meas}e = ${n_meas} \\times 1.60 \\times 10^{-19} \\; \\text{C} \\)</div>
       <p style="margin-top:12px">The charge is quantised — always an integer multiple of the elementary charge \\(e\\). This is exactly what Millikan discovered in 1909.</p>
     </div>
   `;
