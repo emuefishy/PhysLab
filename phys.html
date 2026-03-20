@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysLab — Interactive Experiment Labels</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+MathJax = {
+  tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code','input'] },
+  startup: { typeset: true }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.min.js" async></script>
+<style>
+:root {
+  --bg: #f5f2ec; --surface: #ffffff; --surface-hover: #f0ede6;
+  --border: #d4cfc5; --border-active: #3d6b8e;
+  --text: #2c2c2c; --text-dim: #6b6560; --text-muted: #9a9490;
+  --accent: #3d6b8e; --accent-glow: rgba(61,107,142,0.15); --accent-soft: rgba(61,107,142,0.06);
+  --success: #2e8b57; --success-glow: rgba(46,139,87,0.12);
+  --error: #c0392b; --error-glow: rgba(192,57,43,0.1);
+  --radius: 8px; --radius-sm: 5px; --diagram-bg: #faf8f4;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'IBM Plex Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+
+/* ── HEADER ── */
+header { padding:18px 32px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:100; }
+.logo { display:flex; align-items:center; gap:12px; }
+.logo-icon { width:36px; height:36px; background:var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:16px; color:#fff; }
+.logo-text { font-family:'DM Serif Display',serif; font-size:21px; }
+.logo-tag { font-size:10px; color:var(--text-muted); letter-spacing:1.5px; text-transform:uppercase; }
+.header-right { display:flex; align-items:center; gap:16px; }
+
+.score-display { font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--text-dim); background:var(--bg); padding:7px 14px; border-radius:100px; border:1px solid var(--border); }
+.score-display span { color:var(--success); font-weight:500; }
+
+.btn { background:var(--surface); border:1px solid var(--border); color:var(--text-dim); padding:7px 16px; border-radius:100px; cursor:pointer; font-family:'IBM Plex Sans',sans-serif; font-size:13px; font-weight:500; transition:all 0.2s; }
+.btn:hover { border-color:var(--accent); color:var(--text); }
+.btn-back { border-radius:var(--radius-sm); }
+.btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn-primary:hover { opacity:0.9; color:#fff; }
+
+/* ── PAGES ── */
+.page { display:none; }
+.page.active { display:block; }
+
+/* ── LANDING ── */
+.landing-hero { text-align:center; padding:70px 32px 32px; }
+.landing-hero h1 { font-family:'DM Serif Display',serif; font-size:48px; letter-spacing:-1px; margin-bottom:14px; }
+.landing-hero p { color:var(--text-dim); font-size:17px; font-weight:300; max-width:520px; margin:0 auto; line-height:1.7; }
+
+.experiment-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; padding:32px 32px 80px; max-width:1100px; margin:0 auto; }
+
+.experiment-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; cursor:pointer; transition:all 0.25s; position:relative; overflow:hidden; }
+.experiment-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); opacity:0; transition:opacity 0.25s; }
+.experiment-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.08); }
+.experiment-card:hover::before { opacity:1; }
+
+.card-category { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--accent); letter-spacing:1.2px; text-transform:uppercase; margin-bottom:10px; }
+.card-title { font-family:'DM Serif Display',serif; font-size:20px; margin-bottom:6px; }
+.card-desc { color:var(--text-dim); font-size:13px; font-weight:300; line-height:1.6; margin-bottom:16px; }
+.card-meta { display:flex; align-items:center; gap:14px; font-size:11px; color:var(--text-muted); }
+.card-meta .tag { background:var(--accent-soft); color:var(--accent); padding:3px 9px; border-radius:100px; font-weight:500; }
+.card-coming-soon { opacity:0.4; pointer-events:none; }
+.card-coming-soon .card-title::after { content:' — Coming Soon'; font-family:'IBM Plex Sans',sans-serif; font-size:11px; color:var(--text-muted); font-weight:400; vertical-align:middle; }
+
+/* ── MODE PICKER ── */
+.mode-picker { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); backdrop-filter:blur(6px); z-index:500; align-items:center; justify-content:center; }
+.mode-picker.visible { display:flex; }
+.mode-picker-inner { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:40px; max-width:500px; width:90%; animation:modalIn 0.3s ease; }
+.mode-picker-inner h2 { font-family:'DM Serif Display',serif; font-size:24px; margin-bottom:6px; }
+.mode-picker-inner p { color:var(--text-dim); font-size:14px; margin-bottom:24px; }
+.mode-options { display:flex; flex-direction:column; gap:12px; }
+.mode-option { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; cursor:pointer; transition:all 0.2s; }
+.mode-option:hover { border-color:var(--accent); box-shadow:0 4px 12px rgba(0,0,0,0.06); }
+.mode-option h3 { font-size:15px; font-weight:600; margin-bottom:4px; }
+.mode-option p { font-size:12px; color:var(--text-muted); margin:0; }
+
+@keyframes modalIn { from{opacity:0;transform:scale(0.92) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
+
+/* ── EXPERIMENT HEADER ── */
+.experiment-header { padding:20px 32px; display:flex; align-items:center; gap:16px; }
+.experiment-title { font-family:'DM Serif Display',serif; font-size:22px; }
+
+/* ── LABEL MODE WORKSPACE ── */
+.workspace { display:flex; gap:20px; padding:0 32px 48px; max-width:1400px; margin:0 auto; position:relative; }
+.diagram-container { flex:1; }
+.diagram-panel { background:var(--diagram-bg); border:1px solid var(--border); border-radius:var(--radius); position:relative; overflow:hidden; width:100%; aspect-ratio:10/7; }
+.diagram-panel svg.main-diagram { width:100%; height:100%; display:block; }
+
+.target-dot { position:absolute; width:18px; height:18px; border-radius:50%; background:var(--surface); border:2.5px solid var(--accent); z-index:10; cursor:pointer; transform:translate(-50%,-50%); transition:all 0.25s; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+.target-dot::after { content:''; position:absolute; inset:4px; border-radius:50%; background:var(--accent); opacity:0.3; transition:opacity 0.2s; }
+.target-dot:hover { transform:translate(-50%,-50%) scale(1.3); }
+.target-dot:hover::after { opacity:0.6; }
+.target-dot.active { border-color:var(--accent); transform:translate(-50%,-50%) scale(1.4); box-shadow:0 0 16px var(--accent-glow); }
+.target-dot.active::after { opacity:0.8; }
+.target-dot.matched { border-color:var(--success); background:var(--success); pointer-events:none; }
+.target-dot.matched::after { background:#fff; opacity:0.9; }
+.target-dot.wrong { border-color:var(--error); animation:dotShake 0.4s ease; }
+@keyframes dotShake { 0%,100%{transform:translate(-50%,-50%) scale(1)} 25%{transform:translate(calc(-50% - 4px),-50%) scale(1.1)} 75%{transform:translate(calc(-50% + 4px),-50%) scale(1.1)} }
+
+.labels-panel { width:260px; flex-shrink:0; display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height:85vh; }
+.labels-heading { font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); padding-bottom:8px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:2; }
+.labels-instruction { font-size:12px; color:var(--text-muted); line-height:1.5; padding:8px 0; }
+.label-item { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; cursor:pointer; font-size:13px; font-weight:500; transition:all 0.2s; user-select:none; }
+.label-item:hover { border-color:var(--accent); box-shadow:0 3px 10px rgba(0,0,0,0.06); }
+.label-item.selected { border-color:var(--accent); background:var(--accent-glow); box-shadow:0 0 0 3px var(--accent-glow); }
+.label-item.matched { border-color:var(--success); background:var(--success-glow); opacity:0.6; pointer-events:none; }
+.label-item.matched::before { content:'✓'; position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--success); font-weight:700; font-size:14px; }
+.label-item { position:relative; }
+.label-item .label-hint { display:block; font-size:11px; color:var(--text-muted); font-weight:300; margin-top:2px; }
+
+.connector-svg { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:50; }
+.connector-svg line.active-line { stroke:var(--accent); stroke-width:2.5; stroke-dasharray:6,4; }
+.connector-svg line.matched-line { stroke:var(--success); stroke-width:2; opacity:0.6; }
+
+/* ── EXPERIMENT MODE ── */
+.experiment-workspace { padding:0 32px 60px; max-width:1200px; margin:0 auto; }
+
+.sim-layout { display:flex; gap:24px; }
+.sim-diagram { flex:1; background:var(--diagram-bg); border:1px solid var(--border); border-radius:var(--radius); position:relative; overflow:hidden; aspect-ratio:10/7; min-height:0; }
+.sim-diagram svg { width:100%; height:100%; display:block; }
+
+.sim-sidebar { width:340px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; }
+
+.sim-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.sim-card h3 { font-family:'DM Serif Display',serif; font-size:17px; margin-bottom:12px; }
+.sim-card label { display:block; font-size:12px; color:var(--text-dim); margin-bottom:4px; font-weight:500; }
+.sim-card .value-display { font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--text); margin-bottom:12px; background:var(--bg); padding:6px 10px; border-radius:var(--radius-sm); border:1px solid var(--border); }
+.sim-card input[type=range] { width:100%; margin:4px 0 16px; accent-color:var(--accent); }
+
+.data-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+.data-table th { text-align:left; font-weight:500; color:var(--text-dim); padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }
+.data-table td { padding:6px 8px; border-bottom:1px solid var(--border); font-family:'IBM Plex Mono',monospace; font-size:12px; }
+.data-table tr:last-child td { border-bottom:none; }
+
+.calc-steps { display:flex; flex-direction:column; gap:14px; margin-top:8px; }
+.calc-step { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; }
+.calc-step.locked { opacity:0.4; pointer-events:none; }
+.calc-step.complete { border-color:var(--success); background:var(--success-glow); }
+.calc-step .step-label { font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+.calc-step .step-formula { font-family:'IBM Plex Mono',monospace; font-size:13px; margin-bottom:8px; color:var(--accent); }
+.calc-step .step-formula .MathJax { font-size:105% !important; }
+.calc-step .step-formula mjx-container[display="true"] { margin:6px 0 !important; }
+.calc-step .step-input-row { display:flex; gap:8px; align-items:center; }
+.calc-step input[type=text] { flex:1; font-family:'IBM Plex Mono',monospace; font-size:13px; padding:7px 10px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); outline:none; transition:border-color 0.2s; }
+.calc-step input[type=text]:focus { border-color:var(--accent); }
+.calc-step .step-check { padding:7px 14px; }
+.calc-step .step-result { font-family:'IBM Plex Mono',monospace; font-size:13px; margin-top:8px; padding:6px 10px; border-radius:var(--radius-sm); }
+.calc-step .step-result.correct { background:var(--success-glow); color:var(--success); }
+.calc-step .step-result.wrong { background:var(--error-glow); color:var(--error); }
+.calc-step .step-hint { font-size:11px; color:var(--text-muted); margin-top:6px; cursor:pointer; }
+.calc-step .step-hint:hover { color:var(--accent); }
+.calc-step .step-hint-text { font-size:11px; color:var(--text-dim); margin-top:4px; line-height:1.5; display:none; }
+
+.trial-result { background:var(--surface); border:1px solid var(--success); border-radius:var(--radius); padding:20px; text-align:center; }
+.trial-result h3 { font-family:'DM Serif Display',serif; font-size:20px; color:var(--success); margin-bottom:6px; }
+.trial-result p { color:var(--text-dim); font-size:13px; line-height:1.6; }
+.trial-result .charge-value { font-family:'IBM Plex Mono',monospace; font-size:22px; color:var(--accent); margin:12px 0; }
+.trial-result .multiple { font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--success); }
+
+.constants-ref { font-size:11px; color:var(--text-muted); line-height:1.7; }
+.constants-ref span { font-family:'IBM Plex Mono',monospace; color:var(--text-dim); }
+
+/* ── TOAST ── */
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 24px; font-size:14px; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,0.1); z-index:1000; transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1); pointer-events:none; }
+.toast.visible { transform:translateX(-50%) translateY(0); }
+.toast.success { border-color:var(--success); color:var(--success); }
+.toast.error { border-color:var(--error); color:var(--error); }
+
+/* ── MODAL ── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); backdrop-filter:blur(6px); z-index:500; align-items:center; justify-content:center; }
+.modal-overlay.visible { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:44px; text-align:center; max-width:400px; animation:modalIn 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+.modal h2 { font-family:'DM Serif Display',serif; font-size:26px; margin-bottom:10px; }
+.modal p { color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:24px; }
+.modal button { background:var(--accent); border:none; color:#fff; padding:10px 28px; border-radius:100px; font-family:'IBM Plex Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; }
+
+@media(max-width:900px) {
+  .workspace,.sim-layout { flex-direction:column; padding:0 12px 32px; }
+  .labels-panel,.sim-sidebar { width:100%; max-height:none; }
+  .diagram-panel,.sim-diagram { aspect-ratio:auto; min-height:300px; }
+  header { padding:12px 16px; }
+  .landing-hero { padding:40px 16px 20px; }
+  .landing-hero h1 { font-size:30px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">Φ</div>
+    <div><div class="logo-text">PhysLab</div><div class="logo-tag">Interactive Experiments</div></div>
+  </div>
+  <div class="header-right" id="headerRight">
+    <div class="score-display" id="scoreDisplay" style="display:none">Matched: <span id="scoreCount">0</span> / <span id="scoreTotal">0</span></div>
+    <button class="btn" id="btnReset" style="display:none" onclick="resetExperiment()">Reset</button>
+  </div>
+</header>
+
+<!-- ══════ LANDING ══════ -->
+<div class="page active" id="pageLanding">
+  <div class="landing-hero">
+    <h1>Label the Experiment</h1>
+    <p>Identify apparatus components or run the full experiment with real calculations. Test your physics knowledge interactively.</p>
+  </div>
+  <div class="experiment-grid">
+    <div class="experiment-card" onclick="showModePicker('millikan')">
+      <div class="card-category">Electrostatics</div>
+      <div class="card-title">Millikan's Oil Drop</div>
+      <div class="card-desc">Identify the components or run the experiment to measure the elementary charge.</div>
+      <div class="card-meta"><span class="tag">2 modes</span><span>Label or Calculate</span></div>
+    </div>
+    <div class="experiment-card card-coming-soon"><div class="card-category">Optics</div><div class="card-title">Young's Double Slit</div><div class="card-desc">Label the components demonstrating wave interference and diffraction.</div><div class="card-meta"><span>Coming soon</span></div></div>
+    <div class="experiment-card card-coming-soon"><div class="card-category">Nuclear</div><div class="card-title">Rutherford Scattering</div><div class="card-desc">Map the gold foil experiment that revealed the atomic nucleus.</div><div class="card-meta"><span>Coming soon</span></div></div>
+    <div class="experiment-card card-coming-soon"><div class="card-category">Quantum</div><div class="card-title">Photoelectric Effect</div><div class="card-desc">Identify the apparatus demonstrating the particle nature of light.</div><div class="card-meta"><span>Coming soon</span></div></div>
+    <div class="experiment-card card-coming-soon"><div class="card-category">Electromagnetism</div><div class="card-title">Faraday's Induction</div><div class="card-desc">Label the setup proving a changing B field induces an EMF.</div><div class="card-meta"><span>Coming soon</span></div></div>
+    <div class="experiment-card card-coming-soon"><div class="card-category">Thermodynamics</div><div class="card-title">Joule's Apparatus</div><div class="card-desc">Identify components of the mechanical equivalent of heat experiment.</div><div class="card-meta"><span>Coming soon</span></div></div>
+  </div>
+</div>
+
+<!-- ══════ MODE PICKER ══════ -->
+<div class="mode-picker" id="modePicker">
+  <div class="mode-picker-inner">
+    <h2>Millikan's Oil Drop</h2>
+    <p>Choose how you'd like to learn this experiment.</p>
+    <div class="mode-options">
+      <div class="mode-option" onclick="loadLabelMode('millikan')">
+        <h3>Label Mode</h3>
+        <p>Identify and label each component of the apparatus. 14 labels to match.</p>
+      </div>
+      <div class="mode-option" onclick="loadExperimentMode('millikan')">
+        <h3>Experiment Mode</h3>
+        <p>Run the experiment with real numbers. Adjust the voltage, observe a droplet, and calculate the charge step by step.</p>
+      </div>
+    </div>
+    <div style="margin-top:16px; text-align:center;">
+      <button class="btn" onclick="hideModePicker()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ LABEL MODE PAGE ══════ -->
+<div class="page" id="pageLabelMode">
+  <div class="experiment-header">
+    <button class="btn btn-back" onclick="goHome()">← All Experiments</button>
+    <div class="experiment-title" id="labelTitle"></div>
+  </div>
+  <div class="workspace" id="workspace">
+    <div class="diagram-container"><div class="diagram-panel" id="diagramPanel"></div></div>
+    <div class="labels-panel" id="labelsPanel"><div class="labels-heading">Labels</div></div>
+  </div>
+</div>
+
+<!-- ══════ EXPERIMENT MODE PAGE ══════ -->
+<div class="page" id="pageExpMode">
+  <div class="experiment-header">
+    <button class="btn btn-back" onclick="goHome()">← All Experiments</button>
+    <div class="experiment-title">Millikan's Oil Drop — Experiment Mode</div>
+  </div>
+  <div class="experiment-workspace">
+    <div class="sim-layout">
+      <!-- LIVE DIAGRAM -->
+      <div class="sim-diagram" id="simDiagram"></div>
+
+      <!-- SIDEBAR -->
+      <div class="sim-sidebar">
+        <!-- Constants reference -->
+        <div class="sim-card">
+          <h3>Given Constants</h3>
+          <div class="constants-ref">
+            \(g = 9.81 \; \text{m s}^{-2}\)<br>
+            \(\rho_{\text{oil}} = 886 \; \text{kg m}^{-3}\)<br>
+            \(\eta = 1.81 \times 10^{-5} \; \text{Pa·s}\)<br>
+            \(d = 6.00 \; \text{mm}\)<br>
+            \(s = 2.00 \; \text{mm}\) (fall distance)<br>
+            \(e = 1.60 \times 10^{-19} \; \text{C}\)
+          </div>
+        </div>
+
+        <!-- PHASE 1: Terminal velocity observation -->
+        <div class="sim-card" id="simPhase1">
+          <h3>Phase 1: Measure Terminal Velocity</h3>
+          <p style="font-size:12px; color:var(--text-dim); margin-bottom:12px; line-height:1.5;">
+            The electric field is <strong>off</strong>. A droplet is released and falls under gravity.
+            Watch it fall through the marked distance and record the time.
+          </p>
+          <button class="btn btn-primary" id="btnRelease" onclick="releaseDrop()" style="width:100%">Release Droplet</button>
+          <div id="timerDisplay" style="display:none; margin-top:12px; text-align:center;">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:28px; color:var(--accent);" id="timerText">0.00 s</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Falling through 2.00 mm</div>
+          </div>
+          <div id="phase1Result" style="display:none; margin-top:12px;"></div>
+        </div>
+
+        <!-- PHASE 2: Suspend with voltage -->
+        <div class="sim-card" id="simPhase2" style="display:none">
+          <h3>Phase 2: Suspend the Droplet</h3>
+          <p style="font-size:12px; color:var(--text-dim); margin-bottom:12px; line-height:1.5;">
+            Turn on the electric field and adjust the voltage until the droplet is stationary.
+          </p>
+          <label>Applied Voltage (V)</label>
+          <input type="range" id="voltageSlider" min="50" max="800" value="300" step="1">
+          <div class="value-display" id="voltageValue">300 V</div>
+          <button class="btn btn-primary" id="btnSuspend" onclick="trySuspend()" style="width:100%">Try to Suspend Droplet</button>
+          <div id="suspendFeedback" style="font-size:12px; color:var(--text-muted); margin-top:8px; min-height:18px;"></div>
+        </div>
+
+        <!-- Observed Data (shown after both phases) -->
+        <div class="sim-card" id="simData" style="display:none">
+          <h3>Observed Data</h3>
+          <table class="data-table">
+            <tr><th>Quantity</th><th>Value</th></tr>
+            <tr><td>\(t\) (fall time)</td><td id="dataT">—</td></tr>
+            <tr><td>\(s\) (fall distance)</td><td>\(2.00 \times 10^{-3} \; \text{m}\)</td></tr>
+            <tr><td>\(v_t\) (terminal velocity)</td><td id="dataVt">—</td></tr>
+            <tr><td>\(V\) (suspension voltage)</td><td id="dataV">—</td></tr>
+            <tr><td>\(d\) (plate separation)</td><td>\(6.00 \times 10^{-3} \; \text{m}\)</td></tr>
+          </table>
+        </div>
+
+        <!-- Calculation Steps -->
+        <div class="sim-card" id="simCalc" style="display:none">
+          <h3>Calculate the Charge</h3>
+          <div class="calc-steps" id="calcSteps"></div>
+        </div>
+
+        <!-- Result -->
+        <div id="simResult" style="display:none"></div>
+
+        <!-- New trial button -->
+        <button class="btn btn-primary" id="btnNewTrial" style="display:none; width:100%" onclick="newTrial()">New Droplet</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<svg class="connector-svg" id="connectorSvg"></svg>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="modalOverlay"><div class="modal"><h2>Experiment Complete!</h2><p>You correctly identified every component. Well done!</p><button onclick="goHome()">Back to Experiments</button></div></div>
+
+<script>
+// ════════════════════════════════════════════════
+//  LABEL MODE DATA
+// ════════════════════════════════════════════════
+const labelData = {
+  millikan: {
+    title: "Millikan's Oil Drop — Label Mode",
+    labels: [
+      { id:'atomiser',       text:'Atomiser (Oil Spray)',        hint:'Produces fine oil droplets' },
+      { id:'top_plate',      text:'Top Plate (+ve)',             hint:'Positively charged plate' },
+      { id:'bottom_plate',   text:'Bottom Plate (−ve)',          hint:'Negatively charged plate' },
+      { id:'oil_drop',       text:'Charged Oil Droplet',         hint:'Tiny drop between the plates' },
+      { id:'microscope',     text:'Microscope / Eyepiece',       hint:'Observes droplet motion' },
+      { id:'voltage',        text:'Variable Power Supply',       hint:'Controls p.d. across plates' },
+      { id:'xray',           text:'X-ray / Ionising Source',     hint:'Ionises air to charge drops' },
+      { id:'hole',           text:'Pinhole in Top Plate',        hint:'Allows drops into the field' },
+      { id:'light',          text:'Light Source',                 hint:'Illuminates the droplets' },
+      { id:'uniform_field',  text:'Uniform Electric Field',      hint:'Between the parallel plates' },
+      { id:'insulation',     text:'Insulating Walls',            hint:'Prevents charge leaking' },
+      { id:'wires',          text:'Connecting Wires',            hint:'Connect supply to plates' },
+      { id:'electric_force', text:'Electric Force (upward)',     hint:'Force from E field on charge' },
+      { id:'weight',         text:'Weight / Gravity (downward)', hint:'Gravitational pull on droplet' },
+    ],
+    targetDots: {
+      atomiser:{x:50,y:10}, top_plate:{x:50,y:29}, bottom_plate:{x:50,y:71},
+      oil_drop:{x:50,y:50}, microscope:{x:88,y:47}, voltage:{x:10,y:47},
+      xray:{x:68,y:88}, hole:{x:50,y:35}, light:{x:83,y:62},
+      uniform_field:{x:42,y:55}, insulation:{x:24,y:50}, wires:{x:22,y:33},
+      electric_force:{x:56,y:40}, weight:{x:56,y:60},
+    },
+  }
+};
+
+// ════════════════════════════════════════════════
+//  SHARED STATE
+// ════════════════════════════════════════════════
+let currentMode = null; // 'label' | 'experiment'
+let matched = {};
+let selectedLabel = null;
+let activeLine = null;
+
+// Experiment mode state
+let simDroplet = null; // { n, radius, mass, charge, suspensionV }
+
+// ════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════
+function goHome() {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('pageLanding').classList.add('active');
+  document.getElementById('scoreDisplay').style.display = 'none';
+  document.getElementById('btnReset').style.display = 'none';
+  document.getElementById('modalOverlay').classList.remove('visible');
+  selectedLabel = null;
+  clearConnectorSvg();
+}
+
+function showModePicker(key) {
+  document.getElementById('modePicker').classList.add('visible');
+}
+function hideModePicker() {
+  document.getElementById('modePicker').classList.remove('visible');
+}
+
+function loadLabelMode(key) {
+  hideModePicker();
+  currentMode = 'label';
+  matched = {}; selectedLabel = null;
+  const data = labelData[key];
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('pageLabelMode').classList.add('active');
+  document.getElementById('labelTitle').textContent = data.title;
+  document.getElementById('scoreDisplay').style.display = '';
+  document.getElementById('btnReset').style.display = '';
+  document.getElementById('scoreTotal').textContent = data.labels.length;
+  document.getElementById('scoreCount').textContent = '0';
+  renderLabelMode(data);
+}
+
+function loadExperimentMode(key) {
+  hideModePicker();
+  currentMode = 'experiment';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('pageExpMode').classList.add('active');
+  document.getElementById('scoreDisplay').style.display = 'none';
+  document.getElementById('btnReset').style.display = 'none';
+  newTrial();
+}
+
+function resetExperiment() {
+  if (currentMode === 'label') {
+    matched = {}; selectedLabel = null;
+    document.getElementById('scoreCount').textContent = '0';
+    document.getElementById('modalOverlay').classList.remove('visible');
+    clearConnectorSvg();
+    renderLabelMode(labelData.millikan);
+  }
+}
+
+// ════════════════════════════════════════════════
+//  LABEL MODE RENDERING
+// ════════════════════════════════════════════════
+function renderLabelMode(data) {
+  const panel = document.getElementById('diagramPanel');
+  const labelsPanel = document.getElementById('labelsPanel');
+  panel.innerHTML = ''; labelsPanel.innerHTML = '<div class="labels-heading">Labels</div><div class="labels-instruction">Click a label, then click the matching point on the diagram.</div>';
+
+  renderMillikanSvg(panel, false);
+
+  Object.entries(data.targetDots).forEach(([id, pos]) => {
+    const dot = document.createElement('div');
+    dot.className = 'target-dot'; dot.dataset.id = id;
+    dot.style.left = pos.x + '%'; dot.style.top = pos.y + '%';
+    if (matched[id]) dot.classList.add('matched');
+    dot.addEventListener('click', () => handleDotClick(id, data));
+    dot.addEventListener('mouseenter', () => { if (selectedLabel && !matched[id]) dot.classList.add('active'); });
+    dot.addEventListener('mouseleave', () => dot.classList.remove('active'));
+    panel.appendChild(dot);
+  });
+
+  const shuffled = [...data.labels].sort(() => Math.random() - 0.5);
+  shuffled.forEach(label => {
+    const item = document.createElement('div');
+    item.className = 'label-item'; item.dataset.id = label.id;
+    if (matched[label.id]) item.classList.add('matched');
+    item.innerHTML = `${label.text}<span class="label-hint">${label.hint}</span>`;
+    item.addEventListener('click', () => {
+      if (matched[label.id]) return;
+      if (selectedLabel === label.id) { selectedLabel = null; document.querySelectorAll('.label-item.selected').forEach(el => el.classList.remove('selected')); }
+      else { selectedLabel = label.id; document.querySelectorAll('.label-item.selected').forEach(el => el.classList.remove('selected')); item.classList.add('selected'); }
+    });
+    labelsPanel.appendChild(item);
+  });
+  drawMatchedLines(data);
+}
+
+function handleDotClick(dotId, data) {
+  if (!selectedLabel || matched[dotId]) return;
+  if (selectedLabel === dotId) {
+    matched[dotId] = true;
+    document.querySelector(`.target-dot[data-id="${dotId}"]`)?.classList.add('matched');
+    const lbl = document.querySelector(`.label-item[data-id="${dotId}"]`);
+    if (lbl) { lbl.classList.remove('selected'); lbl.classList.add('matched'); }
+    selectedLabel = null;
+    document.getElementById('scoreCount').textContent = Object.keys(matched).length;
+    showToast('Correct!', 'success');
+    drawMatchedLines(data);
+    if (Object.keys(matched).length === data.labels.length) setTimeout(() => document.getElementById('modalOverlay').classList.add('visible'), 600);
+  } else {
+    const dot = document.querySelector(`.target-dot[data-id="${dotId}"]`);
+    if (dot) { dot.classList.add('wrong'); setTimeout(() => dot.classList.remove('wrong'), 500); }
+    showToast('Not quite — try again', 'error');
+  }
+}
+
+function drawMatchedLines(data) {
+  clearConnectorSvg();
+  const svg = document.getElementById('connectorSvg');
+  const panel = document.getElementById('diagramPanel');
+  if (!panel || !data) return;
+  const pr = panel.getBoundingClientRect();
+  Object.keys(matched).forEach(id => {
+    const dp = data.targetDots[id];
+    const el = document.querySelector(`.label-item[data-id="${id}"]`);
+    if (!dp || !el) return;
+    const lr = el.getBoundingClientRect();
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.classList.add('matched-line');
+    line.setAttribute('x1', pr.left + dp.x/100*pr.width);
+    line.setAttribute('y1', pr.top + dp.y/100*pr.height);
+    line.setAttribute('x2', lr.left);
+    line.setAttribute('y2', lr.top + lr.height/2);
+    svg.appendChild(line);
+  });
+}
+function clearConnectorSvg() { document.getElementById('connectorSvg').innerHTML = ''; }
+
+document.addEventListener('mousemove', e => {
+  if (currentMode !== 'label' || !selectedLabel || matched[selectedLabel]) { if (activeLine) { activeLine.remove(); activeLine=null; } return; }
+  const svg = document.getElementById('connectorSvg');
+  const el = document.querySelector(`.label-item[data-id="${selectedLabel}"]`);
+  if (!el) return;
+  if (!activeLine) { activeLine = document.createElementNS('http://www.w3.org/2000/svg','line'); activeLine.classList.add('active-line'); svg.appendChild(activeLine); }
+  const r = el.getBoundingClientRect();
+  activeLine.setAttribute('x1', r.left); activeLine.setAttribute('y1', r.top+r.height/2);
+  activeLine.setAttribute('x2', e.clientX); activeLine.setAttribute('y2', e.clientY);
+});
+
+document.addEventListener('click', e => {
+  if (currentMode !== 'label') return;
+  if (!e.target.closest('.label-item') && !e.target.closest('.target-dot')) {
+    selectedLabel = null;
+    document.querySelectorAll('.label-item.selected').forEach(el => el.classList.remove('selected'));
+    if (activeLine) { activeLine.remove(); activeLine=null; }
+  }
+});
+
+window.addEventListener('resize', () => { if (currentMode === 'label') drawMatchedLines(labelData.millikan); });
+window.addEventListener('scroll', () => { if (currentMode === 'label') drawMatchedLines(labelData.millikan); }, true);
+
+// ════════════════════════════════════════════════
+//  EXPERIMENT MODE
+// ════════════════════════════════════════════════
+const SIM = {
+  g: 9.81,
+  rhoOil: 886,         // kg/m³
+  eta: 1.81e-5,        // viscosity of air (Pa·s)
+  d: 6.00e-3,          // plate separation (m)
+  e: 1.60e-19,         // elementary charge (C)
+  fallDist: 2.00e-3,   // marked fall distance (m)
+};
+
+let simPhase = 'idle'; // 'idle' | 'falling' | 'fallen' | 'suspending' | 'suspended'
+let simTimer = null;
+let simStartTime = 0;
+let simFallTime = 0;    // recorded fall time in seconds
+
+function newTrial() {
+  // Generate a droplet whose suspension voltage fits comfortably on the slider (80–700 V)
+  // and whose fall time is reasonable to watch (0.5–25 s). Rejection-sample until both hold.
+  let n, radius, volume, mass, charge, vt, fallTime, suspensionV;
+  let safe = false;
+  while (!safe) {
+    n = Math.floor(Math.random() * 6) + 1;
+    radius = (0.5 + Math.random() * 2.0) * 1e-6; // 0.5–2.5 µm
+    volume = (4/3) * Math.PI * Math.pow(radius, 3);
+    mass = SIM.rhoOil * volume;
+    charge = n * SIM.e;
+    vt = (2 * Math.pow(radius, 2) * SIM.rhoOil * SIM.g) / (9 * SIM.eta);
+    fallTime = SIM.fallDist / vt;
+    suspensionV = (mass * SIM.g * SIM.d) / charge;
+    safe = suspensionV >= 80 && suspensionV <= 700 && fallTime >= 0.5 && fallTime <= 25;
+  }
+
+  simDroplet = { n, radius, mass, charge, vt, fallTime, suspensionV };
+  simPhase = 'idle';
+  simFallTime = 0;
+  if (simTimer) { clearInterval(simTimer); simTimer = null; }
+
+  // Reset all UI
+  document.getElementById('btnRelease').disabled = false;
+  document.getElementById('btnRelease').textContent = 'Release Droplet';
+  document.getElementById('timerDisplay').style.display = 'none';
+  document.getElementById('timerText').textContent = '0.00 s';
+  document.getElementById('phase1Result').style.display = 'none';
+  document.getElementById('phase1Result').innerHTML = '';
+
+  document.getElementById('simPhase2').style.display = 'none';
+  const slider = document.getElementById('voltageSlider');
+  slider.value = 300; slider.oninput = null;
+  document.getElementById('voltageValue').textContent = '300 V';
+  document.getElementById('suspendFeedback').textContent = '';
+  document.getElementById('btnSuspend').disabled = false;
+  document.getElementById('btnSuspend').textContent = 'Try to Suspend Droplet';
+
+  document.getElementById('simData').style.display = 'none';
+  document.getElementById('simCalc').style.display = 'none';
+  document.getElementById('simResult').style.display = 'none';
+  document.getElementById('simResult').innerHTML = '';
+  document.getElementById('btnNewTrial').style.display = 'none';
+
+  document.getElementById('simPhase1').style.display = '';
+
+  renderSimDiagram(0, 'idle');
+}
+
+// ── PHASE 1: Terminal velocity ──
+function releaseDrop() {
+  if (simPhase !== 'idle') return;
+  simPhase = 'falling';
+
+  document.getElementById('btnRelease').disabled = true;
+  document.getElementById('btnRelease').textContent = 'Falling…';
+  document.getElementById('timerDisplay').style.display = '';
+
+  renderSimDiagram(0, 'falling');
+
+  simStartTime = performance.now();
+  const totalMs = simDroplet.fallTime * 1000;
+
+  simTimer = setInterval(() => {
+    const elapsed = performance.now() - simStartTime;
+    document.getElementById('timerText').textContent = (elapsed / 1000).toFixed(2) + ' s';
+
+    if (elapsed >= totalMs) {
+      clearInterval(simTimer); simTimer = null;
+      simFallTime = simDroplet.fallTime;
+      simPhase = 'fallen';
+
+      document.getElementById('timerText').textContent = simFallTime.toFixed(2) + ' s';
+      document.getElementById('btnRelease').textContent = '✓ Fall Complete';
+
+      renderSimDiagram(0, 'resting');
+
+      // Show result and move to phase 2
+      const vt = SIM.fallDist / simFallTime;
+      const p1 = document.getElementById('phase1Result');
+      p1.style.display = '';
+      p1.innerHTML = `
+        <div style="background:var(--success-glow); border:1px solid var(--success); border-radius:var(--radius-sm); padding:10px; font-size:12px; color:var(--success);">
+          <strong>Recorded:</strong> \\(t = ${simFallTime.toFixed(2)} \\; \\text{s}\\) over \\(s = 2.00 \\; \\text{mm}\\)<br>
+          Terminal velocity \\(v_t = \\dfrac{s}{t} = ${vt.toExponential(3)} \\; \\text{m s}^{-1}\\)
+        </div>
+      `;
+      typesetMathJax();
+
+      // Unlock phase 2
+      setTimeout(() => {
+        document.getElementById('simPhase2').style.display = '';
+        setupVoltageSlider();
+        renderSimDiagram(300, 'field-falling');
+      }, 800);
+    }
+  }, 30);
+}
+
+// ── PHASE 2: Voltage suspension ──
+function setupVoltageSlider() {
+  const slider = document.getElementById('voltageSlider');
+  const display = document.getElementById('voltageValue');
+  slider.oninput = () => {
+    const v = Number(slider.value);
+    display.textContent = v + ' V';
+    const diff = Math.abs(v - simDroplet.suspensionV);
+    const tolerance = simDroplet.suspensionV * 0.08;
+    if (diff < tolerance) renderSimDiagram(v, 'suspended');
+    else if (v > simDroplet.suspensionV) renderSimDiagram(v, 'field-rising');
+    else renderSimDiagram(v, 'field-falling');
+  };
+}
+
+function trySuspend() {
+  const v = Number(document.getElementById('voltageSlider').value);
+  const diff = Math.abs(v - simDroplet.suspensionV);
+  const tolerance = simDroplet.suspensionV * 0.08;
+  const fb = document.getElementById('suspendFeedback');
+
+  if (diff < tolerance) {
+    simPhase = 'suspended';
+    fb.innerHTML = '<span style="color:var(--success)">The droplet is stationary — balanced!</span>';
+    document.getElementById('btnSuspend').disabled = true;
+    document.getElementById('btnSuspend').textContent = '✓ Droplet Suspended';
+    renderSimDiagram(v, 'suspended');
+    showObservedData(v);
+  } else if (v > simDroplet.suspensionV * 1.08) {
+    fb.textContent = 'The droplet is drifting upward. Reduce the voltage.';
+  } else {
+    fb.textContent = 'The droplet is falling. Increase the voltage.';
+  }
+}
+
+function showObservedData(appliedV) {
+  const vt = SIM.fallDist / simFallTime;
+  document.getElementById('simData').style.display = '';
+  document.getElementById('dataT').innerHTML = `\\(${simFallTime.toFixed(2)} \\; \\text{s}\\)`;
+  document.getElementById('dataVt').innerHTML = `\\(${vt.toExponential(3)} \\; \\text{m s}^{-1}\\)`;
+  document.getElementById('dataV').innerHTML = `\\(${appliedV.toFixed(0)} \\; \\text{V}\\)`;
+
+  document.getElementById('simCalc').style.display = '';
+  buildCalcSteps(appliedV, vt);
+}
+
+function buildCalcSteps(appliedV, vt) {
+  const container = document.getElementById('calcSteps');
+  container.innerHTML = '';
+
+  const r = simDroplet.radius;
+  const m = simDroplet.mass;
+  const q = simDroplet.charge;
+  const n = simDroplet.n;
+  const correctE = appliedV / SIM.d;
+
+  // Helper to format a number as LaTeX scientific notation
+  function tex(val, dp=2) {
+    const exp = Math.floor(Math.log10(Math.abs(val)));
+    const coeff = (val / Math.pow(10, exp)).toFixed(dp);
+    return `${coeff} \\times 10^{${exp}}`;
+  }
+
+  const steps = [
+    {
+      id: 'radius',
+      label: 'Step 1: Find the radius using Stokes\' law',
+      formula: `\\[ v_t = \\frac{2r^2 \\rho g}{9\\eta} \\quad \\Rightarrow \\quad r = \\sqrt{\\frac{9 \\eta \\, v_t}{2 \\rho \\, g}} \\]`,
+      answer: r,
+      tolerance: 0.08,
+      formatAnswer: () => `\\( r = ${tex(r)} \\; \\text{m} \\)`,
+      hint: `\\( r = \\sqrt{\\dfrac{9 \\times ${tex(SIM.eta)} \\times ${tex(vt,3)}}{2 \\times ${SIM.rhoOil} \\times ${SIM.g}}} = ${tex(r)} \\; \\text{m} \\)`,
+      placeholder: 'e.g. 1.50e-6',
+    },
+    {
+      id: 'mass',
+      label: 'Step 2: Calculate the mass',
+      formula: `\\[ m = \\rho \\times \\tfrac{4}{3} \\pi r^3 \\]`,
+      answer: m,
+      tolerance: 0.10,
+      formatAnswer: () => `\\( m = ${tex(m)} \\; \\text{kg} \\)`,
+      hint: `\\( m = ${SIM.rhoOil} \\times \\tfrac{4}{3} \\pi \\times (${tex(r)})^3 = ${tex(m)} \\; \\text{kg} \\)`,
+      placeholder: 'e.g. 3.45e-15',
+    },
+    {
+      id: 'efield',
+      label: 'Step 3: Calculate the electric field',
+      formula: `\\[ E = \\frac{V}{d} \\]`,
+      answer: correctE,
+      tolerance: 0.03,
+      formatAnswer: () => `\\( E = ${tex(correctE)} \\; \\text{V m}^{-1} \\)`,
+      hint: `\\( E = \\dfrac{${appliedV.toFixed(0)}}{${SIM.d}} = ${tex(correctE)} \\; \\text{V m}^{-1} \\)`,
+      placeholder: 'e.g. 5.00e4',
+    },
+    {
+      id: 'charge',
+      label: 'Step 4: Calculate the charge',
+      formula: `\\[ qE = mg \\quad \\Rightarrow \\quad q = \\frac{mg}{E} \\]`,
+      answer: q,
+      tolerance: 0.12,
+      formatAnswer: () => `\\( q = ${tex(q)} \\; \\text{C} \\)`,
+      hint: `\\( q = \\dfrac{${tex(m)} \\times ${SIM.g}}{${tex(correctE)}} = ${tex(q)} \\; \\text{C} \\)`,
+      placeholder: 'e.g. 4.80e-19',
+    },
+    {
+      id: 'nvalue',
+      label: 'Step 5: How many elementary charges?',
+      formula: `\\[ n = \\frac{q}{e} \\]`,
+      answer: n,
+      tolerance: 0.01,
+      formatAnswer: () => `\\( n = ${n} \\)`,
+      hint: `\\( n = \\dfrac{${tex(q)}}{${tex(SIM.e)}} = ${n} \\)`,
+      placeholder: 'e.g. 3',
+      isInteger: true,
+    },
+  ];
+
+  steps.forEach((step, i) => {
+    const div = document.createElement('div');
+    div.className = 'calc-step' + (i > 0 ? ' locked' : '');
+    div.id = 'step-' + step.id;
+    div.innerHTML = `
+      <div class="step-label">${step.label}</div>
+      <div class="step-formula">${step.formula}</div>
+      <div class="step-input-row">
+        <input type="text" id="input-${step.id}" placeholder="${step.placeholder}" autocomplete="off">
+        <button class="btn btn-primary step-check" onclick="checkStep('${step.id}')">Check</button>
+      </div>
+      <div class="step-result" id="result-${step.id}" style="display:none"></div>
+      <div class="step-hint" onclick="this.nextElementSibling.style.display='block'; this.style.display='none';">Show hint</div>
+      <div class="step-hint-text">${step.hint}</div>
+    `;
+    div._stepData = step;
+    div._index = i;
+    container.appendChild(div);
+  });
+  container._steps = steps;
+
+  typesetMathJax();
+}
+
+// Re-typeset MathJax after dynamic content changes
+function typesetMathJax() {
+  if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+    MathJax.typesetPromise().catch(err => console.log('MathJax typeset error:', err));
+  }
+}
+
+function checkStep(stepId) {
+  const container = document.getElementById('calcSteps');
+  const steps = container._steps;
+  const stepDiv = document.getElementById('step-' + stepId);
+  const step = stepDiv._stepData;
+  const idx = stepDiv._index;
+  const input = document.getElementById('input-' + stepId);
+  const resultDiv = document.getElementById('result-' + stepId);
+  let userVal = input.value.trim().replace(/\s/g, '');
+
+  // Parse scientific notation
+  let num;
+  if (step.isInteger) {
+    num = parseInt(userVal);
+  } else {
+    num = parseFloat(userVal);
+  }
+
+  if (isNaN(num)) {
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'step-result wrong';
+    resultDiv.textContent = 'Please enter a valid number (use e notation for powers of 10, e.g. 3.45e-15)';
+    return;
+  }
+
+  const ratio = step.isInteger ? Math.abs(num - step.answer) : Math.abs(num - step.answer) / Math.abs(step.answer);
+  const isCorrect = step.isInteger ? (num === step.answer) : (ratio < step.tolerance);
+
+  if (isCorrect) {
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'step-result correct';
+    resultDiv.textContent = '✓ Correct! ';
+    // Append formatted answer with MathJax
+    const ansSpan = document.createElement('span');
+    ansSpan.innerHTML = step.formatAnswer();
+    resultDiv.appendChild(ansSpan);
+    stepDiv.classList.add('complete');
+    input.disabled = true;
+    typesetMathJax();
+
+    // Unlock next step
+    if (idx < steps.length - 1) {
+      const nextDiv = document.getElementById('step-' + steps[idx + 1].id);
+      nextDiv.classList.remove('locked');
+    }
+
+    // If last step, show result
+    if (idx === steps.length - 1) {
+      showFinalResult();
+    }
+  } else {
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'step-result wrong';
+    if (step.isInteger) {
+      resultDiv.textContent = `✗ Not quite. Try again — check your division.`;
+    } else {
+      resultDiv.textContent = `✗ Not quite (your answer: ${num.toExponential(2)}). Check your working and try again.`;
+    }
+  }
+}
+
+function showFinalResult() {
+  const div = document.getElementById('simResult');
+  div.style.display = '';
+  const qExp = Math.floor(Math.log10(Math.abs(simDroplet.charge)));
+  const qCoeff = (simDroplet.charge / Math.pow(10, qExp)).toFixed(2);
+  div.innerHTML = `
+    <div class="trial-result">
+      <h3>Trial Complete!</h3>
+      <div class="charge-value">\\( q = ${qCoeff} \\times 10^{${qExp}} \\; \\text{C} \\)</div>
+      <div class="multiple">\\( = ${simDroplet.n}e = ${simDroplet.n} \\times 1.60 \\times 10^{-19} \\; \\text{C} \\)</div>
+      <p style="margin-top:12px">The charge is quantised — always an integer multiple of the elementary charge \\(e\\). This is exactly what Millikan discovered in 1909.</p>
+    </div>
+  `;
+  document.getElementById('btnNewTrial').style.display = '';
+  typesetMathJax();
+}
+
+// ════════════════════════════════════════════════
+//  SIM DIAGRAM (live apparatus with moving drop)
+// ════════════════════════════════════════════════
+function renderSimDiagram(voltage, state) {
+  const container = document.getElementById('simDiagram');
+  // States: 'idle' | 'falling' | 'resting' | 'field-falling' | 'field-rising' | 'suspended'
+  const fieldOn = ['field-falling','field-rising','suspended'].includes(state);
+  const fieldOpacity = fieldOn ? Math.min(voltage / 800, 0.35) : 0;
+  const showMarkers = ['falling','resting','idle'].includes(state) || !fieldOn;
+
+  let dropY = 350;
+  let dropAnim = '';
+
+  if (state === 'falling') {
+    dropAnim = `<animateTransform attributeName="transform" type="translate" values="0,0;0,60" dur="${simDroplet.fallTime.toFixed(1)}s" fill="freeze"/>`;
+  } else if (state === 'resting') {
+    dropY = 410; // at bottom marker
+  } else if (state === 'field-falling') {
+    dropAnim = `<animateTransform attributeName="transform" type="translate" values="0,0;0,60" dur="3s" repeatCount="indefinite"/>`;
+  } else if (state === 'field-rising') {
+    dropAnim = `<animateTransform attributeName="transform" type="translate" values="0,0;0,-60" dur="3s" repeatCount="indefinite"/>`;
+  }
+  // 'idle' and 'suspended' — no animation, default position
+
+  const dialAngle = voltage > 0 ? (voltage / 800) * Math.PI + Math.PI : Math.PI;
+
+  let statusText = '';
+  let statusColor = '#9a9490';
+  if (state === 'idle') { statusText = 'Ready — press Release Droplet'; }
+  else if (state === 'falling') { statusText = 'Field OFF — droplet falling at terminal velocity'; statusColor = '#d4960a'; }
+  else if (state === 'resting') { statusText = 'Fall complete — terminal velocity recorded'; statusColor = '#2e8b57'; }
+  else if (state === 'field-falling') { statusText = 'Field ON — droplet still falling, increase voltage'; }
+  else if (state === 'field-rising') { statusText = 'Field ON — droplet rising, reduce voltage'; }
+  else if (state === 'suspended') { statusText = 'DROPLET SUSPENDED — BALANCED'; statusColor = '#2e8b57'; }
+
+  container.innerHTML = `<svg viewBox="0 0 1000 700" style="width:100%;height:100%;display:block">
+    <defs>
+      <linearGradient id="smA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8898b0"/><stop offset="100%" stop-color="#5a6a82"/></linearGradient>
+      <linearGradient id="smB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7e8ea6"/><stop offset="100%" stop-color="#546276"/></linearGradient>
+      <linearGradient id="smC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e8e4dc"/><stop offset="100%" stop-color="#d8d4cc"/></linearGradient>
+      <linearGradient id="smI" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4935e"/><stop offset="50%" stop-color="#b07c48"/><stop offset="100%" stop-color="#966838"/></linearGradient>
+      <radialGradient id="smG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.8"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></radialGradient>
+      <pattern id="smH" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#8a6030" stroke-width="1.5" opacity="0.25"/></pattern>
+      <filter id="smSh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.15"/></filter>
+    </defs>
+
+    <rect width="1000" height="700" fill="#faf8f4"/>
+
+    <!-- Atomiser -->
+    <g filter="url(#smSh)">
+      <ellipse cx="500" cy="38" rx="40" ry="22" fill="#8898b0" stroke="#a0aec0" stroke-width="1"/>
+      <rect x="488" y="56" width="24" height="14" rx="4" fill="#6a7a8e" stroke="#8898b0" stroke-width="1"/>
+      <rect x="482" y="68" width="36" height="30" rx="5" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1"/>
+      <rect x="494" y="98" width="12" height="22" rx="2" fill="#7a8a9e"/>
+    </g>
+
+    <!-- Chamber -->
+    <rect x="250" y="170" width="500" height="370" rx="8" fill="url(#smC)" stroke="#b8b4aa" stroke-width="2.5"/>
+
+    <!-- Insulators -->
+    <rect x="272" y="220" width="26" height="270" rx="4" fill="url(#smI)" stroke="#8a6030" stroke-width="1"/>
+    <rect x="272" y="220" width="26" height="270" rx="4" fill="url(#smH)"/>
+    <rect x="702" y="220" width="26" height="270" rx="4" fill="url(#smI)" stroke="#8a6030" stroke-width="1"/>
+    <rect x="702" y="220" width="26" height="270" rx="4" fill="url(#smH)"/>
+
+    <!-- Top plate -->
+    <g filter="url(#smSh)"><rect x="296" y="195" width="408" height="24" rx="3" fill="url(#smA)" stroke="#a0aec0" stroke-width="1"/></g>
+    <rect x="490" y="217" width="20" height="8" rx="1.5" fill="#faf8f4" stroke="#b8b4aa" stroke-width="1"/>
+
+    <!-- Field lines -->
+    ${Array.from({length:8},(_,i)=>{const x=330+i*46; return `<line x1="${x}" y1="235" x2="${x}" y2="475" stroke="#3d6b8e" stroke-width="0.8" stroke-dasharray="4,10" opacity="${fieldOpacity.toFixed(2)}"/>`;}).join('')}
+
+    <!-- Fall distance markers (shown in phase 1) -->
+    ${showMarkers ? `
+      <line x1="580" y1="350" x2="600" y2="350" stroke="#c0392b" stroke-width="1.5"/>
+      <line x1="580" y1="410" x2="600" y2="410" stroke="#c0392b" stroke-width="1.5"/>
+      <line x1="590" y1="350" x2="590" y2="410" stroke="#c0392b" stroke-width="1" stroke-dasharray="3,3"/>
+      <text x="610" y="384" font-family="IBM Plex Mono,monospace" font-size="11" fill="#c0392b">2.00 mm</text>
+    ` : ''}
+
+    <!-- Oil droplet -->
+    <g>
+      ${dropAnim}
+      <circle cx="500" cy="${dropY}" r="16" fill="url(#smG)"/>
+      <circle cx="500" cy="${dropY}" r="5" fill="#f59e0b" stroke="#d4860a" stroke-width="1"/>
+      ${state === 'suspended' ? `
+        <line x1="540" y1="${dropY-10}" x2="540" y2="${dropY-65}" stroke="#3d6b8e" stroke-width="3" stroke-linecap="round"/>
+        <polygon points="533,${dropY-60} 547,${dropY-60} 540,${dropY-76}" fill="#3d6b8e"/>
+        <line x1="540" y1="${dropY+10}" x2="540" y2="${dropY+65}" stroke="#c0392b" stroke-width="3" stroke-linecap="round"/>
+        <polygon points="533,${dropY+60} 547,${dropY+60} 540,${dropY+76}" fill="#c0392b"/>
+      ` : ''}
+    </g>
+
+    <!-- Bottom plate -->
+    <g filter="url(#smSh)"><rect x="296" y="488" width="408" height="24" rx="3" fill="url(#smB)" stroke="#a0aec0" stroke-width="1"/></g>
+
+    <!-- Wires -->
+    <path d="M 100,340 L 240,340 Q 252,340 252,330 L 252,207 L 296,207" fill="none" stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 100,370 L 225,370 Q 240,370 240,385 L 240,500 L 296,500" fill="none" stroke="#2980b9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- PSU -->
+    <g filter="url(#smSh)">
+      <rect x="30" y="300" width="130" height="100" rx="8" fill="#3e4860" stroke="#5a6a80" stroke-width="1.5"/>
+      <rect x="44" y="315" width="60" height="24" rx="3" fill="#1a1e28" stroke="#2a3040" stroke-width="1"/>
+      <text x="74" y="332" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="13" fill="${fieldOn ? '#4a7cff' : '#555'}">${fieldOn ? voltage + ' V' : 'OFF'}</text>
+      <circle cx="130" cy="340" r="18" fill="#1a1e28" stroke="#3e4860" stroke-width="2"/>
+      <line x1="130" y1="340" x2="${130 + 14*Math.cos(dialAngle)}" y2="${340 + 14*Math.sin(dialAngle)}" stroke="${fieldOn?'#4a7cff':'#555'}" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="60" cy="388" r="6" fill="#c0392b" stroke="#a0302a" stroke-width="1.5"/>
+      <circle cx="120" cy="388" r="6" fill="#2980b9" stroke="#1a6090" stroke-width="1.5"/>
+    </g>
+
+    <!-- Microscope -->
+    <g filter="url(#smSh)">
+      <rect x="770" y="310" width="110" height="30" rx="5" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1.2"/>
+      <rect x="790" y="306" width="16" height="38" rx="4" fill="#6a7a8e" stroke="#8a9aae" stroke-width="1"/>
+      <rect x="755" y="316" width="18" height="18" rx="3" fill="#6a7a8e" stroke="#8a9aae" stroke-width="1"/>
+      <rect x="878" y="312" width="32" height="26" rx="8" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1.2"/>
+    </g>
+
+    <!-- Light -->
+    <g filter="url(#smSh)">
+      <rect x="780" y="410" width="80" height="48" rx="6" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1.2"/>
+      <circle cx="820" cy="428" r="5" fill="#fbbf24" opacity="0.3"/>
+    </g>
+    <polygon points="780,418 520,342 520,358 780,442" fill="#fbbf24" opacity="0.03"/>
+
+    <!-- X-ray -->
+    <g filter="url(#smSh)">
+      <rect x="600" y="580" width="100" height="50" rx="6" fill="#3e4860" stroke="#5a6a80" stroke-width="1.5"/>
+      <circle cx="650" cy="598" r="8" fill="none" stroke="#9b59b6" stroke-width="1.5" opacity="0.5"/>
+      <circle cx="650" cy="598" r="3" fill="#9b59b6" opacity="0.3"/>
+    </g>
+
+    <!-- Status -->
+    <text x="500" y="680" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="13" fill="${statusColor}">${statusText}</text>
+  </svg>`;
+}
+
+// ════════════════════════════════════════════════
+//  SHARED SVG (for label mode)
+// ════════════════════════════════════════════════
+function renderMillikanSvg(container, showHints) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 1000 700');
+  svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+  svg.classList.add('main-diagram');
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="metalA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8898b0"/><stop offset="100%" stop-color="#5a6a82"/></linearGradient>
+      <linearGradient id="metalB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7e8ea6"/><stop offset="100%" stop-color="#546276"/></linearGradient>
+      <linearGradient id="chamber" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e8e4dc"/><stop offset="100%" stop-color="#d8d4cc"/></linearGradient>
+      <linearGradient id="insulGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4935e"/><stop offset="50%" stop-color="#b07c48"/><stop offset="100%" stop-color="#966838"/></linearGradient>
+      <radialGradient id="dropGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.8"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></radialGradient>
+      <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="#8a6030" stroke-width="1.5" opacity="0.25"/></pattern>
+      <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.15"/></filter>
+    </defs>
+    <rect width="1000" height="700" fill="#faf8f4"/>
+
+    <!-- Atomiser -->
+    <g filter="url(#shadow)"><ellipse cx="500" cy="38" rx="40" ry="22" fill="#8898b0" stroke="#a0aec0" stroke-width="1"/><rect x="488" y="56" width="24" height="14" rx="4" fill="#6a7a8e" stroke="#8898b0" stroke-width="1"/><rect x="482" y="68" width="36" height="30" rx="5" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1"/><rect x="494" y="98" width="12" height="22" rx="2" fill="#7a8a9e"/></g>
+    <circle cx="496" cy="126" r="2" fill="#d4960a" opacity="0.6"><animate attributeName="cy" values="126;150;170" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.6;0.3;0" dur="1.8s" repeatCount="indefinite"/></circle>
+    <circle cx="500" cy="130" r="2.5" fill="#d4960a" opacity="0.7"><animate attributeName="cy" values="130;155;178" dur="2.1s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.7;0.3;0" dur="2.1s" repeatCount="indefinite"/></circle>
+    <circle cx="505" cy="128" r="1.8" fill="#d4960a" opacity="0.5"><animate attributeName="cy" values="128;152;175" dur="1.9s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.5;0.2;0" dur="1.9s" repeatCount="indefinite"/></circle>
+
+    <!-- Chamber -->
+    <rect x="250" y="170" width="500" height="370" rx="8" fill="url(#chamber)" stroke="#b8b4aa" stroke-width="2.5"/>
+
+    <!-- Insulators -->
+    <rect x="272" y="220" width="26" height="270" rx="4" fill="url(#insulGrad)" stroke="#8a6030" stroke-width="1"/><rect x="272" y="220" width="26" height="270" rx="4" fill="url(#hatch)"/>
+    <rect x="702" y="220" width="26" height="270" rx="4" fill="url(#insulGrad)" stroke="#8a6030" stroke-width="1"/><rect x="702" y="220" width="26" height="270" rx="4" fill="url(#hatch)"/>
+
+    <!-- Top plate --><g filter="url(#shadow)"><rect x="296" y="195" width="408" height="24" rx="3" fill="url(#metalA)" stroke="#a0aec0" stroke-width="1"/></g>
+    <rect x="490" y="217" width="20" height="8" rx="1.5" fill="#faf8f4" stroke="#b8b4aa" stroke-width="1"/>
+
+    <!-- Field lines -->
+    ${Array.from({length:8},(_,i)=>{const x=330+i*46;return`<line x1="${x}" y1="235" x2="${x}" y2="475" stroke="#3d6b8e" stroke-width="0.6" stroke-dasharray="4,10" opacity="0.12"/>`;}).join('')}
+
+    <!-- Oil droplet -->
+    <circle cx="500" cy="350" r="16" fill="url(#dropGlow)"/><circle cx="500" cy="350" r="5" fill="#f59e0b" stroke="#d4860a" stroke-width="1"/><circle cx="498" cy="348" r="1.8" fill="#fff" opacity="0.4"/>
+
+    <!-- Force arrows -->
+    <line x1="540" y1="340" x2="540" y2="275" stroke="#3d6b8e" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="533,280 547,280 540,264" fill="#3d6b8e"/>
+    <line x1="540" y1="360" x2="540" y2="425" stroke="#c0392b" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="533,420 547,420 540,436" fill="#c0392b"/>
+
+    <!-- Bottom plate --><g filter="url(#shadow)"><rect x="296" y="488" width="408" height="24" rx="3" fill="url(#metalB)" stroke="#a0aec0" stroke-width="1"/></g>
+
+    <!-- Wires -->
+    <path d="M 100,340 L 240,340 Q 252,340 252,330 L 252,207 L 296,207" fill="none" stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 100,370 L 225,370 Q 240,370 240,385 L 240,500 L 296,500" fill="none" stroke="#2980b9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- PSU -->
+    <g filter="url(#shadow)"><rect x="30" y="300" width="130" height="100" rx="8" fill="#3e4860" stroke="#5a6a80" stroke-width="1.5"/><rect x="44" y="315" width="60" height="24" rx="3" fill="#1a1e28" stroke="#2a3040" stroke-width="1"/><circle cx="130" cy="340" r="18" fill="#1a1e28" stroke="#3e4860" stroke-width="2"/><line x1="130" y1="340" x2="140" y2="328" stroke="#4a7cff" stroke-width="2.5" stroke-linecap="round"/><circle cx="60" cy="388" r="6" fill="#c0392b" stroke="#a0302a" stroke-width="1.5"/><circle cx="120" cy="388" r="6" fill="#2980b9" stroke="#1a6090" stroke-width="1.5"/></g>
+
+    <!-- Microscope -->
+    <g filter="url(#shadow)"><rect x="770" y="310" width="110" height="30" rx="5" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1.2"/><rect x="790" y="306" width="16" height="38" rx="4" fill="#6a7a8e" stroke="#8a9aae" stroke-width="1"/><rect x="755" y="316" width="18" height="18" rx="3" fill="#6a7a8e" stroke="#8a9aae" stroke-width="1"/><ellipse cx="755" cy="325" rx="4" ry="9" fill="#d0e4f0" stroke="#8ab4d4" stroke-width="0.8" opacity="0.5"/><rect x="878" y="312" width="32" height="26" rx="8" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1.2"/></g>
+    <line x1="755" y1="325" x2="510" y2="350" stroke="#8ab4d4" stroke-width="0.6" stroke-dasharray="4,6" opacity="0.2"/>
+
+    <!-- Light -->
+    <g filter="url(#shadow)"><rect x="780" y="410" width="80" height="48" rx="6" fill="#5a6a7e" stroke="#7a8a9e" stroke-width="1.2"/><circle cx="820" cy="428" r="10" fill="#fbbf24" opacity="0.1"/><circle cx="820" cy="428" r="5" fill="#fbbf24" opacity="0.3"/></g>
+    <polygon points="780,418 520,342 520,358 780,442" fill="#fbbf24" opacity="0.03"/>
+    <line x1="780" y1="420" x2="525" y2="344" stroke="#fbbf24" stroke-width="0.5" opacity="0.12"/>
+    <line x1="780" y1="440" x2="525" y2="356" stroke="#fbbf24" stroke-width="0.5" opacity="0.12"/>
+
+    <!-- X-ray -->
+    <g filter="url(#shadow)"><rect x="600" y="580" width="100" height="50" rx="6" fill="#3e4860" stroke="#5a6a80" stroke-width="1.5"/><circle cx="650" cy="598" r="8" fill="none" stroke="#9b59b6" stroke-width="1.5" opacity="0.5"/><circle cx="650" cy="598" r="3" fill="#9b59b6" opacity="0.3"/></g>
+    <path d="M 640,580 Q 630,568 640,556" fill="none" stroke="#9b59b6" stroke-width="1" opacity="0.25"/>
+    <path d="M 655,580 Q 648,565 655,550" fill="none" stroke="#9b59b6" stroke-width="1" opacity="0.2"/>
+    <path d="M 670,580 Q 665,570 670,558" fill="none" stroke="#9b59b6" stroke-width="1" opacity="0.15"/>
+
+    <text x="500" y="680" text-anchor="middle" font-family="DM Serif Display,serif" font-size="15" fill="#b8b4aa">Millikan's Oil Drop Apparatus</text>
+  `;
+  container.appendChild(svg);
+}
+
+// ════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast visible ' + type;
+  setTimeout(() => t.classList.remove('visible'), 1400);
+}
+</script>
+</body>
+</html>
